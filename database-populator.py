@@ -31,7 +31,7 @@ else:
 with open('FUT-player-database.csv', mode='w', encoding="utf-8", newline='') as player_file:
     player_writer = csv.writer(player_file, delimiter=',', quotechar='"', quoting=csv.QUOTE_MINIMAL)
     player_id = 0
-    for page in range(500):
+    for page in range(3):
         print(page)
         response = requests.get('https://www.futbin.com/players?page=' + str(page))
 
