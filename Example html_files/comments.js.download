@@ -1,0 +1,1897 @@
+jQuery(document).ready(function() {
+
+    var cYear = parseInt($("#page-info").data("year"));
+    var cPageType = parseInt($("#page-info").data("page"));
+    var pageID = parseInt($("#page-info").data("id"));
+
+     window.userType = $("#site-user-info").data('user-level');
+
+     pageDetails = {
+        year: cYear,
+        type: cPageType,
+        id: pageID
+    }
+
+
+    //append new added comment html
+    function appendNewSubComment(commentData) {
+        var obj = {};
+
+
+
+        obj.ID = commentData['ID'];
+        obj.thread_ID = commentData['commentId'];
+        obj.reply_parent_count = jQuery(".show-more-sub-comments[data-comment-id='" + obj.thread_ID + "']") + 1;
+
+        obj.username = jQuery("meta[name='nav-username']").attr("content");
+        obj.created_unix = new Date();
+
+        obj.comment_text_clean = commentData['commentContent'];
+        obj.likes = 0;
+
+        var subComment = createSubCommentHtml(obj, obj.reply_parent_count);
+        $("#thread_"+ obj.thread_ID + " .sub-comments-area").append(subComment);
+
+    }
+
+//show more comments button
+    function showMoreComments(thread) {
+        //ajax
+    }
+
+
+    function testComm(thread) {
+        var y =3;
+    }
+
+    $(".comments-block").on("click",".comment-vote", function(){
+        var clickedEle = $(this);
+        var that = $(this).attr('data-type');
+        var comment_id = parseInt($(this).parents('.comment-block ').attr('data-comment-id'));
+        var page_type = $("#page-info").data('page');
+        event.preventDefault();
+        data = {};
+        data['csrf_name'] = jQuery("meta[name=general_csrf-name]").attr('content');
+        data['csrf_value'] = jQuery("meta[name=general_csrf-value]").attr('content');
+        data['votingType'] = that;
+        data['comment_id'] = comment_id;
+        data['page_type'] = page_type;
+        data['year'] = cYear;
+        var currentVotes = $(this).parent().find(".comment-total-votes");
+        $.ajax({
+            type: 'POST',
+            url: "/user/"+window.year+"/commentVote",
+           // cache: false,
+            data: data,
+            statusCode: {
+                401: function (data) {
+                    swal({
+                        allowEscapeKey: true,
+                        allowOutsideClick: true,
+                        type: "error",
+                        title: "You have to login in order to vote.",
+                        text: "The window will be closed in...",
+                        timer: 2000,
+                        showConfirmButton: false
+                    });
+                },  500: function (data) {
+                    swal({
+                        allowEscapeKey: true,
+                        allowOutsideClick: true,
+                        type: "error",
+                        title: "Something went wrong.",
+                        text: "The window will be closed in...",
+                        timer: 2000,
+                        showConfirmButton: false
+                    });
+                }
+            }, success: function (data) {
+
+                switch (data.data) {
+                    case true:
+                        var currentVotesInt = parseInt(currentVotes.attr("data-current-votes"));
+                        if(that > 0) {
+                            currentVotes.attr("data-current-votes",currentVotesInt+that);
+
+                        } else if (that < 0) {
+                            currentVotes.attr("data-current-votes",currentVotesInt-that);
+                        }
+                        changeCommentVote(clickedEle);
+
+                        break;
+
+                    case "alreadyVoted":
+                        toastr["error"]("You've already voted");
+                        break;
+                    case "voteNotAllowedToYourComment":
+                        toastr["error"]("You can't vote to your own comment ;)" );
+                        break;
+                    // case "no_coins_left":
+                    //     swal({
+                    //         allowEscapeKey: true,
+                    //         allowOutsideClick: true,
+                    //         type: "error",
+                    //         title: "You don't have enough coins left to vote. ",
+                    //         text: "The window will be closed in...",
+                    //         timer: 2000,
+                    //         showConfirmButton: false
+                    //     });
+                    //     break;
+                    case "not_allowed_vote":
+                        toastr["error"]("You aren't allowed to vote yet. " );
+                        break;
+                }
+
+                if(data.error == "not_allowed_to_vote_verify") {
+
+                    swal({
+                        title: 'Verify account',
+                        text: "Your account is not phone verified. Please verify (phone verification) your account in order to be able to vote a comment.",
+                        icon: 'warning',
+                        showCancelButton: true,
+                        confirmButtonColor: '#55cca2',
+                        cancelButtonColor: '#ff3547',
+                        confirmButtonText: 'Verify',
+                        cancelButtonText: 'Close'
+                    }).then((result) => {
+
+                        if (result) {
+                            window.location.href = "/user/verification/phone";
+
+                        }
+                    })
+                    return;
+                }
+            }
+        });
+    });
+
+
+    function changeCommentVote(ele) {
+
+        var voteType = $(ele).data('type');
+        currentLikes = parseInt( ele.parent().find('.comment-likes').attr('data-current-votes') );
+        if(voteType === "up") {
+            ele.parent().find('.comment-likes').html(currentLikes+1).addClass('animated flash');
+        }
+
+        if(voteType === "down") {
+            ele.parent().find('.comment-likes').html(currentLikes-1);
+        }
+
+        toastr.options = {
+            "closeButton": true,
+            "debug": false,
+            "newestOnTop": false,
+            "progressBar": true,
+            "positionClass": "toast-bottom-center",
+            "preventDuplicates": true,
+            "onclick": null,
+            "showDuration": "300",
+            "hideDuration": "1000",
+            "timeOut": "5000",
+            "extendedTimeOut": "1000",
+            // "showEasing": "swing",
+            // "hideEasing": "linear",
+            "showMethod": "fadeIn",
+            "hideMethod": "fadeOut"
+        };
+        toastr["success"]("We've received your vote.");
+    }
+
+    function animateCommentVote(ele) {
+        var duration = 600;
+        var voteType = $(ele).data('type');
+        if(voteType === "up") {
+            ele.find('.comments-coins').animate({
+                top: "-200%",
+                right: "-15%",
+                opacity: 0
+            }, duration);
+        }
+
+        if(voteType === "down") {
+            ele.find('.comments-coins').animate({
+                top: "-200%",
+                right: "-1%",
+                opacity: 0
+            }, duration);
+        }
+
+        toastr.options = {
+            "closeButton": true,
+            "debug": false,
+            "newestOnTop": false,
+            "progressBar": true,
+            "positionClass": "toast-bottom-center",
+            "preventDuplicates": true,
+            "onclick": null,
+            "showDuration": "300",
+            "hideDuration": "1000",
+            "timeOut": "5000",
+            "extendedTimeOut": "1000",
+            // "showEasing": "swing",
+            // "hideEasing": "linear",
+            "showMethod": "fadeIn",
+            "hideMethod": "fadeOut"
+        };
+        toastr["success"]("We've received your vote.");
+    }
+
+
+
+//show more threads
+    $(".comments-block").on("click","#show-more-comment-threads", function(){
+
+        var pageNum = parseInt($(this).attr('data-page-num'));
+
+        var newPageNum = pageNum+1;
+        $(this).attr('data-page-num',newPageNum);
+
+        var pageType = $("#page-info").data('page');
+       // alert(pageType);
+      //  if(pageType === 1) {
+            var pageId = $('#page-info').data('id');
+            doAjaxRequestComments(pageType,pageId,"add", false);
+      //  }
+
+    });
+
+    $(".comments-block").on("click",".show-more-sub-comments", function(){
+
+
+        var clicks = parseInt($(this).attr('data-clicks'));
+        var commentCount = parseInt($(this).attr('data-count'));
+        var btnType = $(this).data('btn-type');
+        var pageId = $('#page-info').data('id');
+        if($(this).hasClass('active') && clicks > 0) {
+            $(this).removeClass('active');
+
+            var hideBtn = '<i class="fas fa-caret-down"></i> View All ('+commentCount+')';
+            $(this).html(hideBtn);
+            $(this).parents('.comment-block').find('.sub-comments-area').slideUp('fast');
+
+        } else {
+            var spinner = createSpinnerHtml();
+            $(this).parents('.comment-block').parent().append(spinner);
+            $(this).attr('data-clicks',clicks+1);
+            var comment_id = $(this).attr('data-comment-id');
+            var cPageType = parseInt($("#page-info").data("page"));
+            doAjaxRequestShowMoreSubCommentsLoop(cPageType,pageId,comment_id);
+            $(this).addClass('active');
+
+            var showBtn = '<i class="fas fa-caret-up"></i> Hide All ('+commentCount+')';
+            $(this).html(showBtn);
+            $(this).parents('.comment-block').find('.sub-comments-area').slideDown('fast');
+
+        }
+
+    });
+
+
+    $(".comments-block").on("click",".show-more-thread-sub-comments", function(){
+
+
+
+        var clicks = parseInt($(this).attr('data-clicks'));
+        var commentCount = parseInt($(this).attr('data-count'));
+        var btnType = $(this).data('btn-type');
+        var pageId = $('#page-info').data('id');
+        var cPageType = parseInt($("#page-info").data("page"));
+
+        if($(this).hasClass('active') && clicks > 0) {
+            $(this).removeClass('active');
+
+            hideBtn = '<i class="fas fa-caret-down"></i> View replies ('+commentCount+')';
+            $(this).html(hideBtn);
+            $(this).parents('.col-11').find('.sub-comments-child-area').slideUp('fast');
+
+        } else {
+
+            $(this).attr('data-clicks',clicks+1);
+            var comment_id = $(this).attr('data-comment-id');
+            var spinner = createSpinnerHtml();
+            $(this).parents('#sub_comment_'+comment_id).append(spinner);
+            doAjaxRequestSubComments(cPageType,pageId,comment_id);
+            $(this).addClass('active');
+
+            var showBtn = '<i class="fas fa-caret-up"></i> Hide replies ('+commentCount+')';
+            $(this).html(showBtn);
+            $(this).parents('.col-11').find('.sub-comments-child-area').slideDown('fast');
+
+        }
+
+    });
+
+    $( ".comments-filter" ).click(function() {
+
+        var spinner = createSpinnerHtml();
+        $(".comments-content-area").prepend(spinner);
+        var pageId = $('#page-info').data('id');
+        var cPageType = parseInt($("#page-info").data("page"));
+        $( ".comments-filter" ).removeClass('active');
+        $(this).addClass('active');
+        doAjaxRequestComments(cPageType,pageId,"init", false);
+    });
+
+    $(".sticky.sticky-comments-right").sticky({
+        topSpacing: 90,
+        zIndex: 2,
+        stopper: ".stop-sticky"
+    });
+
+    $(".comments-block").on("click",".delete-comment", function(){
+
+        parms = {};
+        parms['page_id'] = $('#page-info').data('id');
+        parms['comment_type']  = parseInt($("#page-info").data("page"));
+        parms['comment_id'] =  $(this).closest('.comment-block').attr('data-comment-id');
+
+
+        $.ajax({
+            type: 'POST',
+            url: "/user/"+window.year+"/deleteComment",
+            cache: false,
+            data: parms,
+            statusCode: {
+                401: function (data) {
+                    swalError("You have to login in order to submit a comment.");
+
+                },  500: function (data) {
+                    swalError("Something went wrong.");
+                }
+            }, success: function (data) {
+
+                if(data.error == "success") {
+
+                    $('.comment-block[data-comment-id="'+parms['comment_id']+'"]').remove();
+                    swalSuccess("The comment has been removed. It can take up to 5 minutes before it takes effect on the web.");
+                }
+
+                return;
+            }, error: function (data) {
+                swalError("500 - Something went wrong.");
+
+            }
+        });
+
+
+    });
+
+//show more threads
+// $(".comments-block").on("click",".show-more-sub-comments", function(){
+//     // var pageNum = parseInt($(this).attr('data-page-num'));
+//     // var newPageNum = pageNum+1;
+//     // $(this).attr('data-page-num',newPageNum);
+//
+//     var comment_id = jQuery(this).attr('data-comment-id');
+//     var pageType = parseInt ( jQuery(this).closest(".comment-block").attr("data-page-type") );
+//
+//     //player
+//     if(pageType === 1) {
+//         var playerId = $('.player-ids').data('player-id');
+//         doAjaxRequestShowMoreSubCommentsLoop(pageType, playerId, comment_id);
+//     }
+//
+// });
+
+//show main comment div - textarea
+    jQuery("#main_comment_input").on("click", function () {
+        $(this).hide();
+        $(".main_comment_area").fadeIn();
+        $("#main_comment_textarea .ql-editor").focus();
+    });
+
+//hide main comment div
+    jQuery(".close-main-comment-area").on("click", function () {
+        $("#main_comment_input").show();
+        $(".main_comment_area").hide();
+    });
+
+
+    $(".comments-block").on("click",".submit-comment", function(){
+        $(this).addClass('disabled');
+        var spinner = createSpinnerHtml();
+        $(this).parent().parent().parent().append(spinner);
+        var commentData = {};
+        var commentId = $(this).attr('data-id');
+
+      //  var commentType = parseInt($(this).attr('data-type'));
+        if(typeof commentId === "undefined" || commentId.length === 0 ) {
+            var commentContent = document.querySelector("#main_comment_textarea > div.ql-editor").innerHTML; // comment html
+        } else {
+            commentContent = document.querySelector("#sub_comment_textarea_"+commentId+" > div.ql-editor").innerHTML; // comment html
+        }
+
+         commentContent = commentContent.replace(/<img[^>]*>/g,"");
+        // commentContent = joypixels.shortnameToImage(commentContent);
+
+        commentData["commentId"] = commentId;
+        commentData["commentType"] = cPageType;
+        commentData["commentContent"] = commentContent;
+
+
+        submitCommentData(commentData);
+    });
+
+    function toasterSuccess(txt) {
+        toastr.options = {
+            "closeButton": true,
+            "debug": false,
+            "newestOnTop": false,
+            "progressBar": true,
+            "positionClass": "toast-bottom-left",
+            "preventDuplicates": true,
+            "onclick": null,
+            "showDuration": "300",
+            "hideDuration": "1000",
+            "timeOut": "5000",
+            "extendedTimeOut": "1000",
+            // "showEasing": "swing",
+            // "hideEasing": "linear",
+            "showMethod": "fadeIn",
+            "hideMethod": "fadeOut"
+        };
+        toastr["success"](txt);
+    }
+
+    function submitCommentData(commentData) {
+
+        var logged = $("#site-user-info").data('logged');
+
+        var data = {};
+        data['csrf_name'] = jQuery("meta[name=general_csrf-name]").attr('content');
+        data['csrf_value'] = jQuery("meta[name=general_csrf-value]").attr('content');
+        data['comment_id'] = commentData.commentId;
+        data['content'] = commentData.commentContent;
+        data['comment_type'] = pageDetails.type;
+        data['player_id'] = pageDetails.id;
+
+        if(data['comment_type'] == 1) {
+            var playerId = $('.player-ids').data('player-id');
+            data['player_id'] = playerId;
+        }
+
+
+        if(data['content'].length === 0 || data['content'] == "<p><br></p>") {
+            swalError("Your comment is empty :(");
+            $("#sub_comment_"+commentData.commentId).find(".submit-comment").removeClass('disabled');
+            $(".main_comment_area").parent().parent().find(".submit-comment").removeClass('disabled');
+            clearCommentsSpinner();
+            throw new Error("Empty content!");
+
+        }
+
+
+
+
+
+
+        if(logged != "logged_in") {
+            $("#sub_comment_"+commentData.commentId).find(".submit-comment").removeClass('disabled');
+            $(".main_comment_area").parent().parent().find(".submit-comment").removeClass('disabled');
+            clearCommentsSpinner();
+            swalError("You have to login in order to submit a comment.");
+
+        } else {
+
+            $.ajax({
+                type: 'POST',
+                url: "/user/"+window.year+"/submitComment",
+                cache: false,
+                data: data,
+                statusCode: {
+                    401: function (data) {
+                        $("#sub_comment_"+commentData.commentId).find(".submit-comment").removeClass('disabled');
+                        $(".main_comment_area").parent().parent().find(".submit-comment").removeClass('disabled');
+                        clearCommentsSpinner();
+                        swalError("You have to login in order to submit a comment.");
+
+                    },  500: function (data) {
+                        $("#sub_comment_"+commentData.commentId).find(".submit-comment").removeClass('disabled');
+                        $(".main_comment_area").parent().parent().find(".submit-comment").removeClass('disabled');
+                        clearCommentsSpinner();
+                        swalError("Something went wrong.");
+                    }
+                }, success: function (data) {
+                    $("#sub_comment_"+commentData.commentId).find(".submit-comment").removeClass('disabled');
+                    $(".main_comment_area").parent().parent().find(".submit-comment").removeClass('disabled');
+                    clearCommentsSpinner();
+                    if(data.error == "success") {
+                       // toasterSuccess("Your comment has been submitted.");
+                        swalSuccess("Your comment has been submitted and will be published in a few minutes");
+                        if(commentData.commentType === 1) {
+                            commentData['ID'] = data;
+
+                            //refresh comments and close reply
+                            if (typeof commentData['commentId'] == undefined || commentData['commentId'] == '') {
+                                jQuery(".close-main-comment-area").trigger("click");
+                                doAjaxRequestComments(1,playerId,"init", false);
+
+                            //on sub comment append and close reply
+                            } else {
+                                appendNewSubComment(commentData);
+                                jQuery(".comment-block[data-comment-id='" + commentData['commentId'] + "']").find(".close-sub-comment-area").first().trigger("click");
+                            }
+                        }
+                        return;
+                    }
+                    if(data.error == "comments_limit") {
+                        swalError("Comments per day limit reached.");
+                        return;
+                    }
+                    if(data.error == "comments_limit_user_comment") {
+                        swalError("You cannot comment to your own comments.");
+                        return;
+                    }
+
+                    if(data.error == "sub_comments_limit_user") {
+                        swalError("You have replied to this comment too many times.");
+                        return;
+                    }
+
+                    if(data.error == "comment_limit_user_specific_page") {
+                        swalError("You have posted too many comments on this page.");
+                        return;
+                    }
+
+                    if(data.error == "not_allowed_to_comment") {
+                        swalError("You are not allowed to comment.");
+                        return;
+                    }
+
+                    if(data.error == "not_allowed_to_comment_new") {
+                        swalError("You are not allowed to comment yet.");
+                        return;
+                    }
+                    if(data.error == "not_allowed_to_comment_verify") {
+
+                        swal({
+                            title: 'Verify account',
+                            text: "Your account is not phone verified. Please verify (phone verification) your account in order to be able to comment.",
+                            icon: 'warning',
+                            showCancelButton: true,
+                            confirmButtonColor: '#55cca2',
+                            cancelButtonColor: '#ff3547',
+                            confirmButtonText: 'Verify',
+                            cancelButtonText: 'Close'
+                        }).then((result) => {
+
+                            if (result) {
+                                window.location.href = "/user/verification/phone";
+
+                            }
+                    })
+                        return;
+                    }
+                    return;
+                }, error: function (data) {
+                    $("#sub_comment_"+commentData.commentId).find(".submit-comment").removeClass('disabled');
+                    $(".main_comment_area").parent().parent().find(".submit-comment").removeClass('disabled');
+                    clearCommentsSpinner();
+
+                }
+            });
+        }
+
+    }
+
+    function getPageType() {
+        var pageType = parseInt($("#page-info").data('page'));
+
+        return pageType;
+    }
+//report commend
+    $(".comments-block").on("click",".report-comment", function(){
+        var commentId = $(this).attr('data-comment-id');
+
+        $("#report-comment-modal-btn").attr('data-comment-id',commentId);
+
+    });
+
+
+    $("body").on("click","#report-comment-modal-btn", function(){
+        var data = {}
+        var commentId = $(this).attr('data-comment-id');
+
+        var url = window.location.href;
+
+        data['comment_id'] = commentId;
+        data['url'] = url;
+        data['page_type'] = getPageType();
+
+
+        $.ajax({
+            type: 'POST',
+            url: "/user/"+window.year+"/reportComment",
+            cache: false,
+            data: data,
+            statusCode: {
+                401: function (data) {
+                    swalError("You have to login in order to submit a comment.");
+                },  500: function (data) {
+                    swalError("Something went wrong.");
+                }
+            }, success: function (data) {
+                if(data.error == "success") {
+                    swalSuccess("Your player report has been submitted.");
+
+                    $('#report-comment-modal').modal('toggle');
+
+                    // if(commentData.commentType == 1) {
+                    //     var playerId = $('.player-ids').data('player-id');
+                    //     doAjaxRequestComments("player",playerId);
+                    // }
+                    return;
+                }
+                if(data.error == "already_reported") {
+                    swalError("We've already received your report.");
+
+                    return;
+                }
+                if(data.error == "reports_limit") {
+                    swalError("You've exceeded the number of allowed reports per day.");
+
+                    return;
+                }
+
+
+
+
+
+                return;
+            }, error: function (data) {
+                swalError("Something went wrong. Please try again later.");
+            }
+        });
+
+    });
+
+    var commentsToolbarOptions = [
+        ['bold', 'italic','span'],        // toggled buttons
+        //  ['blockquote', 'code-block'],
+
+       // [{ 'header': 5 }, { 'header': 6 }],               // custom button values
+        [{ 'list': 'ordered'}, { 'list': 'bullet' }],
+
+        //[{ 'size': ['small', false] }],  // custom dropdown
+        ['blockquote'],
+        [{ 'header': [5, 6, false] }],
+
+      //  [{ 'color': [] }, { 'background': [] }],          // dropdown with defaults from theme
+        // [{ 'font': [] }]
+        //[{ 'align': [] }],
+
+        //  ['clean']                                         // remove formatting button
+    ];
+
+    // var emojiCat = {"people":"_1f603","nature":"_1f603","food":"_1f603","activity":"_1f603","travel":"_1f603","objects":"_1f603","symbols":"_1f603","flags":"_1f603"};
+    // var currentEmojiTab = "people";
+
+
+
+    //emoji search
+    $(".comments-block").on("keyup",".emoji-search-input", function() {
+
+        var query = $(this).val().toLowerCase();
+
+
+        if(query.length > 1) {
+            emojiSearchHtmlArr = [];
+            $(".emojiTabs a").removeClass('active show');
+            $(".emojiTabs  #search-tab-classic-shadow").addClass('active show');
+            $(".emojiTabs  .tab-pane").removeClass('active show');
+            $(".emojiTabs  #search-emoji-tab").addClass('active show');
+            $.each( joypixels.fullEmojiList, function( key, value ) {
+                value.category = (key.indexOf("-1f3f") >= 0) ? 'diversity' : value.category;
+
+                if (value.name.indexOf(query) !== -1) {
+                    singleEmojiHtml = '<span class="emoji-search-ele-holder"><span class="emoji-search-ele joypixels joypixels-24-'+value.category+' _'+key+'" data-ucode="'+key+'" data-short-name="'+value.shortname+'" title="'+value.name+'"></span></span>';
+
+                    emojiSearchHtmlArr.push(singleEmojiHtml);
+                }
+
+            });
+
+            $("#search-emoji-tab").html(emojiSearchHtmlArr);
+
+        }
+
+
+    });
+
+
+    // (function ($, undefined) {
+    //     $.fn.getCursorPosition = function() {
+    //         var el = $(this).get(0);
+    //         var pos = 0;
+    //         if('selectionStart' in el) {
+    //             pos = el.selectionStart;
+    //         } else if('selection' in document) {
+    //             el.focus();
+    //             var Sel = document.selection.createRange();
+    //             var SelLength = document.selection.createRange().text.length;
+    //             Sel.moveStart('character', -el.value.length);
+    //             pos = Sel.text.length - SelLength;
+    //         }
+    //         return pos;
+    //     }
+    // })(jQuery);
+
+    //close emoji area
+    $(".comments-block").on("click",".close-emojiSearch", function() {
+        $(".emojiSearchArea").html('').hide();
+    });
+
+    //on click event for emoji  - add to commment text area
+    $(".comments-block").on("click",".emoji-search-ele", function() {
+
+        emojiCode = $(this).attr('data-ucode');
+        emojiShortName = $(this).attr('data-short-name');
+
+        singleEmojiHtml = '<img class="comment-content-emoji" src="/design/img/joypixels/5.0/png/unicode/32/'+emojiCode+'.png"> <span>'+emojiShortName+'</span>';
+       // singleEmojiHtml = '<span> '+emojiShortName+'</span>';
+
+        if( $(this).parents(".sub_comment_area").length === 0) {
+            curretCommentHtml = $(this).parents(".main_comment_area").find(".ql-editor").html();
+        } else {
+            curretCommentHtml = $(this).parents(".sub_comment_area").find(".ql-editor").html();
+        }
+
+        emojiCount = (curretCommentHtml.match(/:/g) || []).length; //logs 3
+
+        if(emojiCount >= 8)  {
+            toastr["error"]("You can add up to 3 emojis" ); return false;
+        }
+        if( $(this).parents(".sub_comment_area").length === 0) {
+           $(this).parents(".main_comment_area").find(".ql-editor").find('p').append(singleEmojiHtml);
+        } else {
+            $(this).parents(".sub_comment_area").find(".ql-editor").find('p').append(singleEmojiHtml);
+        }
+
+
+
+        $(".emojiSearchArea").html('').hide();
+
+    });
+
+    emojiHtmlArr = [];
+    emojiPeopleHtmlArr = [];
+    emojiNatureHtmlArr = [];
+    emojiFoodHtmlArr = [];
+    emojiTravelHtmlArr = [];
+    emojiActivityHtmlArr = [];
+    emojiObjectsHtmlArr = [];
+    emojiSymbolsHtmlArr = [];
+    emojiFlagsHtmlArr = [];
+    emojiFutbinHtmlArr = [];
+    //create emoji area overlay
+    $(".comments-block").on("click",".emoji-btn", function() {
+
+        joypixels.imageType = 'png';
+        joypixels.sprites = true;
+        var thisBtnPos = $(this).position();
+       $emojiWindow =  $(this).parents(".sub_comment_area").find(".emojiSearchArea");
+       if($emojiWindow.length === 0) {
+           $emojiWindow =  $(this).parents(".main_comment_area").find(".emojiSearchArea");
+       }
+        $(".emojiSearchArea").html('').hide();
+        emojiHtml = '' +
+            '<div class="row">' +
+                '<div class="emojiSearch w-100 mt-2">' +
+                    '<form class="form-inline ">\n' +
+                    ' <div class="row w-100"> <div class="col-1 d-none"> <i class="fa fa-search ml-4" aria-hidden="true"></i> </div>\n' +
+                    '  <div class="col-11 pl-0"><input class="form-control emoji-search-input form-control-sm ml-3 w-100 text-left justify-content-center" type="text"  placeholder="Search"\n' +
+                    '    aria-label="Search"></div>' +
+            '       <div class="col-1"><i class="fa fa-times mx-3 close-emojiSearch" aria-hidden="true"></i></div></div>\n' +
+                    '</form>' +
+                '</div>' +
+            '    <div class="row col-12" >' +
+            '<div class="emojiTabs w-100"><!-- Classic tabs -->\n' +
+            '<div class="classic-tabs mx-2">\n' +
+            '\n' +
+            '  <ul class="nav tabs-emoji" id="myClassicTabShadow" role="tablist">\n' +
+            '    <li class="nav-item">\n' +
+            '      <a class="nav-link  waves-light   disabled" id="search-tab-classic-shadow" data-toggle="tab" href="#search-emoji-tab"\n' +
+            '        role="tab" aria-controls="profile-classic-shadow" aria-selected="true"><span class="joypixels joypixels-24-objects _1f50e " title="Search">🔎</span></a>\n' +
+            '    </li>\n' +
+            '    <li class="nav-item">\n' +
+            '      <a class="nav-link waves-light active show" id="futbin-tab-classic-shadow" data-toggle="tab" href="#futbin-emoji-tab"\n' +
+            '        role="tab" aria-controls="follow-classic-shadow" aria-selected="false"><img src="/design/img/fb-small-icon.png" style="width: 21px;"></a></a>\n' +
+            '    </li>\n' +
+            '    <li class="nav-item">\n' +
+            '      <a class="nav-link waves-light " id="people-tab-classic-shadow" data-toggle="tab" href="#people-emoji-tab"\n' +
+            '        role="tab" aria-controls="follow-classic-shadow" aria-selected="false"><span class="joypixels joypixels-24-people _1f603" title="People">😃</span></a></a>\n' +
+            '    </li>\n' +
+            '    <li class="nav-item">\n' +
+            '      <a class="nav-link waves-light" id="nature-tab-classic-shadow" data-toggle="tab" href="#nature-emoji-tab"\n' +
+            '        role="tab" aria-controls="contact-classic-shadow" aria-selected="false"><span class="joypixels joypixels-24-nature  _1f332" title="Nature">🌲</span></a></a>\n' +
+            '    </li>\n' +
+            '    <li class="nav-item">\n' +
+            '      <a class="nav-link waves-light" id="food-tab-classic-shadow" data-toggle="tab" href="#food-emoji-tab"\n' +
+            '        role="tab" aria-controls="awesome-classic-shadow" aria-selected="false"><span class="joypixels joypixels-24-food  _1f355" title="Food"></span></a>\n' +
+            '    </li>\n' +
+            '    <li class="nav-item">\n' +
+            '      <a class="nav-link waves-light" id="activity-tab-classic-shadow" data-toggle="tab" href="#activity-emoji-tab"\n' +
+            '        role="tab" aria-controls="awesome-classic-shadow" aria-selected="false"><span class="joypixels joypixels-24-activity  _26bd" title="Activity"></span></a>\n' +
+            '    </li>\n' +
+            '    <li class="nav-item">\n' +
+            '      <a class="nav-link waves-light" id="travel-tab-classic-shadow" data-toggle="tab" href="#travel-emoji-tab"\n' +
+            '        role="tab" aria-controls="awesome-classic-shadow" aria-selected="false"><span class="joypixels joypixels-24-travel  _1f697" title="Travel"></span></a>\n' +
+            '    </li>\n' +
+            '    <li class="nav-item">\n' +
+            '      <a class="nav-link waves-light" id="objects-tab-classic-shadow" data-toggle="tab" href="#objects-emoji-tab"\n' +
+            '        role="tab" aria-controls="awesome-classic-shadow" aria-selected="false"><span class="joypixels joypixels-24-objects  _1f4a1" title="Objects"></span></a>\n' +
+            '    </li>\n' +
+            '    <li class="nav-item">\n' +
+            '      <a class="nav-link waves-light" id="symbols-tab-classic-shadow" data-toggle="tab" href="#symbols-emoji-tab"\n' +
+            '        role="tab" aria-controls="awesome-classic-shadow" aria-selected="false"><span class="joypixels joypixels-24-symbols  _1f523" title="Symbols"></span></a>\n' +
+            '    </li>\n' +
+            '    <li class="nav-item">\n' +
+            '      <a class="nav-link waves-light" id="flags-tab-classic-shadow" data-toggle="tab" href="#flags-emoji-tab"\n' +
+            '        role="tab" aria-controls="awesome-classic-shadow" aria-selected="false"><span class="joypixels joypixels-24-flags  _1f3f3" title="Flags"></span></a>\n' +
+            '    </li>\n' +
+            '  </ul>\n' +
+            '\n' +
+            '  <div class="tab-content" id="myClassicTabContentShadow">\n' +
+            '    <div class="tab-pane fade " id="search-emoji-tab" role="tabpanel" aria-labelledby="search-tab-classic-shadow">\n' +
+            '      search\n' +
+            '    </div>\n' +
+            '    <div class="tab-pane fade active show" id="futbin-emoji-tab" role="tabpanel" aria-labelledby="futbin-tab-classic-shadow">\n' +
+            '     futbin\n' +
+            '    </div>\n' +
+            '    <div class="tab-pane fade" id="people-emoji-tab" role="tabpanel" aria-labelledby="people-tab-classic-shadow">\n' +
+            '     people\n' +
+            '    </div>\n' +
+            '    <div class="tab-pane fade" id="nature-emoji-tab" role="tabpanel" aria-labelledby="nature-tab-classic-shadow">\n' +
+            '      nature\n' +
+            '    </div>\n' +
+            '    <div class="tab-pane fade" id="food-emoji-tab" role="tabpanel" aria-labelledby="food-tab-classic-shadow">\n' +
+            '     food\n' +
+            '    </div>\n' +
+            '    <div class="tab-pane fade" id="activity-emoji-tab" role="tabpanel" aria-labelledby="activity-tab-classic-shadow">\n' +
+            '     activity\n' +
+            '    </div>\n' +
+            '    <div class="tab-pane fade" id="travel-emoji-tab" role="tabpanel" aria-labelledby="travel-tab-classic-shadow">\n' +
+            '     travel\n' +
+            '    </div>\n' +
+            '    <div class="tab-pane fade" id="symbols-emoji-tab" role="tabpanel" aria-labelledby="symbols-tab-classic-shadow">\n' +
+            '     symbols\n' +
+            '    </div>\n' +
+            '    <div class="tab-pane fade" id="objects-emoji-tab" role="tabpanel" aria-labelledby="objects-tab-classic-shadow">\n' +
+            '     objects\n' +
+            '    </div>\n' +
+            '    <div class="tab-pane fade" id="flags-emoji-tab" role="tabpanel" aria-labelledby="flags-tab-classic-shadow">\n' +
+            '     flags\n' +
+            '    </div>\n' +
+            '  </div>\n' +
+            '\n' +
+            '</div>\n' +
+            '<!-- Classic tabs --></div>' +
+            '    </div>' +
+            '</div>';
+        $emojiWindow.html(emojiHtml);
+        $emojiWindow.show();
+        // $emojiWindow.css({
+        //     'top' : 35+thisBtnPos.top+'px',
+        //     'left' : 100+thisBtnPos.left+'px'
+        // }).show();
+
+
+      //  console.log(thisBtnPos.top,thisBtnPos.left);
+       // console.log(joypixels.emojiList );
+
+
+        if (emojiPeopleHtmlArr.length === 0) {
+
+            $.each( joypixels.fullEmojiList, function( key, value ) {
+                if(!value.shortname.includes("tone2") && !value.shortname.includes("tone3") && !value.shortname.includes("tone4") && !value.shortname.includes("tone5")) {
+                    value.category = (key.indexOf("-1f3f") >= 0) ? 'diversity' : value.category;
+                    singleEmojiHtml = '<span class="emoji-search-ele-holder"><span class="emoji-search-ele joypixels joypixels-24-'+value.category+' _'+key+'" data-ucode="'+key+'" data-short-name="'+value.shortname+'" title="'+value.name+'"></span></span>';
+
+                    if( value.category === "people" || value.category === "diversity")  emojiPeopleHtmlArr.push(singleEmojiHtml);
+                    if( value.category === "nature")  emojiNatureHtmlArr.push(singleEmojiHtml);
+                    if( value.category === "food")  emojiFoodHtmlArr.push(singleEmojiHtml);
+                    if( value.category === "travel")  emojiTravelHtmlArr.push(singleEmojiHtml);
+                    if( value.category === "activity")  emojiActivityHtmlArr.push(singleEmojiHtml);
+                    if( value.category === "objects")  emojiObjectsHtmlArr.push(singleEmojiHtml);
+                    if( value.category === "symbols")  emojiSymbolsHtmlArr.push(singleEmojiHtml);
+                    if( value.category === "flags")  emojiFlagsHtmlArr.push(singleEmojiHtml);
+                    if( value.category === "futbin")  emojiFutbinHtmlArr.push(singleEmojiHtml);
+                }
+
+
+            });
+        }
+        $("#futbin-emoji-tab").html(emojiFutbinHtmlArr);
+        $("#people-emoji-tab").html(emojiPeopleHtmlArr);
+        $("#nature-emoji-tab").html(emojiNatureHtmlArr);
+        $("#food-emoji-tab").html(emojiFoodHtmlArr);
+        $("#travel-emoji-tab").html(emojiTravelHtmlArr);
+        $("#activity-emoji-tab").html(emojiActivityHtmlArr);
+        $("#objects-emoji-tab").html(emojiObjectsHtmlArr);
+        $("#symbols-emoji-tab").html(emojiSymbolsHtmlArr);
+        $("#flags-emoji-tab").html(emojiFlagsHtmlArr);
+
+    });
+
+    $(".comments-block").on("click",".reply-to-comment", function() {
+
+
+
+        var commentId = $(this).parents('.comment-block').attr('data-comment-id');
+
+        // var txtArea = '   <div class="sub_comment_area">\n' +
+        //     '                               <textarea id="sub_comment_textarea" class="form-control white p-3 rounded m-3" placeholder="Write your reply..." ></textarea>\n' +
+        //     '                               <div class="row text-right float-right">\n' +
+        //     '                                   <button type="button" class="btn btn-sm btn-danger close-sub-comment-area">Close</button>\n' +
+        //     '\n' +
+        //     '                                   <button type="button" class="btn btn-sm btn-primary submit-comment" data-id="'+commentId+'" data-type="player">Submit Comment</button>\n' +
+        //     '\n' +
+        //     '                               </div>\n' +
+        //     '                           </div>';
+
+        var txtArea = '   <div class="sub_comment_area mt-1"> <div class="emojiSearchArea" style="display: none;"></div>\n' +
+            '                             <div id="sub_comment_textarea_'+commentId+'" class="rich-editor"></div> \n' +
+            '                                <div class="row mt-2 px-0 comment-chars-count">' +
+            '                               <div class="col-11 px-0">' +
+            '                               <div class="progress md-progress" >\n' +
+            '                                          <div class="progress-bar bg-info" role="progressbar" style="width: 50%" aria-valuenow="50" aria-valuemin="0" aria-valuemax="100"></div>' +
+            '                               </div> ' +
+            '                               </div> ' +
+            '                                <div class="col-1 px-0 chars-count-div text-center"><div class="d-inline current-chars-count">0</div><div class="d-inline">/600</div></div> ' +
+            '                               <div class="emoji-btn"><i class="icon-happy"></i></div>  \n' +
+            '                               <div class="row text-right d-block w-100 float-right">\n' +
+            '                                   <button type="button" class="btn btn-sm btn-danger close-sub-comment-area">Close</button>\n' +
+
+            '                                   <button type="button" class="btn btn-sm btn-primary submit-comment" data-id="'+commentId+'">Submit Comment</button>\n' +
+            '\n' +
+            '                               </div>\n' +
+            '                           </div>';
+
+
+
+        $(this).parent().parent()
+            .find('.reply-to-area').hide()
+            .html(txtArea);
+        // .append(txtArea);
+
+        var subCommentEditor = new Quill('#sub_comment_textarea_'+commentId+'', {
+            modules: {
+                toolbar: commentsToolbarOptions ,
+                'history': {          // Enable with custom configurations
+                    'delay': 500,
+                    'userOnly': true
+                }
+            },
+            theme: 'snow',
+            placeholder: 'Your comment goes in here...'
+        });
+
+        $(this).parent().parent().find('.reply-to-area').slideDown();
+
+        $("#sub_comment_textarea_"+commentId+" .ql-editor").focus();
+
+        subCommentEditor.on('editor-change', function(eventName) {
+            var limit = 599;
+            //limit words in editor
+            if (subCommentEditor.getLength() > limit) {
+                subCommentEditor.deleteText(limit, subCommentEditor.getLength());
+            }
+
+        });
+
+        subCommentEditor.on('editor-change', function(eventName) {
+            var limit = 599;
+            //limit words in editor
+            if (subCommentEditor.getLength() > limit) {
+                subCommentEditor.deleteText(limit, subCommentEditor.getLength());
+            }
+
+            $("#sub_comment_textarea_"+commentId+"").parent().find(".current-chars-count").html(subCommentEditor.getLength());
+            var progressBarPrec = Math.round((subCommentEditor.getLength()/600)*100);
+            $("#sub_comment_textarea_"+commentId+"").parent().find(".progress-bar").css("width",progressBarPrec+"%");
+
+        });
+    });
+
+    if(cYear > 18) {
+        var mainCommentEditor = new Quill('#main_comment_textarea', {
+            modules: {
+                toolbar: commentsToolbarOptions ,
+                'history': {          // Enable with custom configurations
+                    'delay': 500,
+                    'userOnly': true
+                }
+            },
+            theme: 'snow',
+            placeholder: 'Your comment goes in here...'
+        });
+
+        mainCommentEditor.on('editor-change', function(eventName) {
+            var limit = 599;
+            //limit words in editor
+            if (mainCommentEditor.getLength() > limit) {
+                mainCommentEditor.deleteText(limit, mainCommentEditor.getLength());
+            }
+
+            $("#main_comment_textarea").parent().find(".current-chars-count").html(mainCommentEditor.getLength());
+            var progressBarPrec = Math.round((mainCommentEditor.getLength()/600)*100);
+            $("#main_comment_textarea").parent().find(".progress-bar").css("width",progressBarPrec+"%");
+
+
+
+        });
+    }
+
+
+
+//show main comment div - textarea
+//     jQuery("#main_comment_input").on("click", function () {
+//         $(this).hide();
+//         $("#main_comment_textarea").focus();
+//         $(".main_comment_area").show();
+//     });
+
+//hide main comment div
+    $(".comments-block").on("click",".close-sub-comment-area", function(){
+        $(this).parents(".sub_comment_area ").hide();
+    });
+
+
+
+
+});
+
+var attemptsSubComments;
+function doAjaxRequestSubComments(page,id,comment_id) {
+    attemptsSubComments = 0;
+    doAjaxRequestSubCommentsLoop(page,id,comment_id);
+}
+
+function doAjaxRequestSubCommentsLoop(page,id,comment_id) {
+
+    attemptsSubComments += 1;
+    if (attemptsSubComments > 3) {
+        console.log('Something went wrong, please try to refresh the page.');
+        return;
+    }
+    // var cPageType = parseInt($("#page-info").data("page"));
+    var  data_type = 'json';
+
+    var url = "/"+pageDetails.year+"/comments/"+page+"/"+id;
+
+    var dataString = {};
+    dataString['pagination'] = $("#show-more-comment-threads").attr('data-page-num');
+     dataString["comment_branch"] = "sub";
+    dataString["comment_id"] = comment_id;
+
+    jQuery.ajax({
+        url: url,
+        type: "GET",
+        data: dataString,
+       // cache: false,
+        cache: "",
+        dataType: data_type,
+        success: function (data) {
+
+            var countData = _.size(data);
+
+    //
+
+            var mainCount = 0;
+            var comments = [];
+            var parentID = "";
+            $.each( data, function( key, value ) {
+
+                mainCount++;
+                var comment =  createSubCommentHtml(value,mainCount);
+                comments.push(comment);
+                parentID = value.parent_ID;
+            });
+
+            $("#sub_comment_"+parentID).find(".sub-comments-child-area").html(comments);
+
+            // if(countData >  19) {
+            //     $("#show-more-comment-threads").fadeIn();
+            // } else {
+            //     $("#show-more-comment-threads").fadeOut();
+            // }
+            //
+            // if(countData === 0) {
+            //     var no_results = ' <div class="text-center p-5"> No comments were found </div>';
+            //     $(".comments-content-area").append(no_results);
+            // }
+            $("#main_comments_spinner").hide();
+            clearCommentsSpinner();
+        }, error: function (error) {
+            $("#main_comments_spinner").hide();
+            clearCommentsSpinner();
+            doAjaxRequestSubCommentsLoop(page,id,comment_id);
+        }
+    });
+
+}
+
+//first sub comments
+var attemptsShowMoreSubComments;
+function doAjaxRequestShowMoreSubComments(page,id,comment_id) {
+    attemptsShowMoreSubComments = 0;
+    doAjaxRequestShowMoreSubCommentsLoop(page,id,comment_id);
+}
+
+function doAjaxRequestShowMoreSubCommentsLoop(page,id,comment_id) {
+
+    attemptsShowMoreSubComments += 1;
+    if (attemptsShowMoreSubComments > 3) {
+        console.log('Something went wrong, please try to refresh the page.');
+        return;
+    }
+    // var cPageType = parseInt($("#page-info").data("page"));
+    var  data_type = 'json';
+    var url = "/"+pageDetails.year+"/comments/"+page+"/"+id;
+    var dataString = {};
+    dataString['pagination'] = $("#show-more-comment-threads").attr('data-page-num');
+     dataString["comment_branch"] = "sub";
+    dataString["comment_id"] = comment_id;
+
+    jQuery.ajax({
+        url: url,
+        type: "GET",
+        data: dataString,
+        //cache: false,
+        cache: "",
+        dataType: data_type,
+        success: function (data) {
+
+            var countData = _.size(data);
+
+    //
+
+            var mainCount = 0;
+            var comments = [];
+            var parentID = "";
+            $.each( data, function( key, value ) {
+                
+                
+                parentID = value.parent_ID;
+
+                var pageComment = $(".comment-block[data-comment-id='" + parentID + "']").find(".sub-comments-area").find("#sub_comment_" + value.ID);
+                if (pageComment.length === 0) {
+                    mainCount++;
+                    var comment =  createSubCommentHtml(value,mainCount);
+                    comments.push(comment);
+                }
+
+                
+            });
+
+            $(".comment-block[data-comment-id='" + parentID + "']").find(".sub-comments-area").append(comments);
+
+            // if(countData >  19) {
+            //     $("#show-more-comment-threads").fadeIn();
+            // } else {
+            //     $("#show-more-comment-threads").fadeOut();
+            // }
+            //
+            // if(countData === 0) {
+            //     var no_results = ' <div class="text-center p-5"> No comments were found </div>';
+            //     $(".comments-content-area").append(no_results);
+            // }
+            $("#main_comments_spinner").hide();
+            clearCommentsSpinner();
+        }, error: function (error) {
+            jQuery("#main_comments_spinner").hide();
+            clearCommentsSpinner();
+            doAjaxRequestShowMoreSubCommentsLoop(page,id,comment_id);
+        }
+    });
+
+}
+
+function clearCommentsSpinner() {
+    $('.comments-loader').remove();
+}
+
+
+
+
+var attemptsComments;
+function doAjaxRequestComments(page,id,action, update_position) {
+    attemptsComments = 0;
+    doAjaxRequestCommentsLoop(page,id,action, update_position);
+}
+
+function doAjaxRequestCommentsLoop(page,id,action, update_position) {
+
+    attemptsComments += 1;
+    if (attemptsComments > 3) {
+        console.log('Something went wrong, please try to refresh the page.');
+        return;
+    }
+   // var cPageType = parseInt($("#page-info").data("page"));
+    var  data_type = 'json';
+    var url = "/"+pageDetails.year+"/comments/"+page+"/"+id;
+    var dataString = {};
+    dataString['pagination'] = $("#show-more-comment-threads").attr('data-page-num');
+    if (action === "scrubber") {
+        dataString['pagination'] = jQuery("#scrubber-page").attr("data-page");
+    }
+   // dataString["comment_type"] = cPageType;
+    var orderBy = $(".comments-filter.active").data("type");
+    dataString['order_by'] = orderBy;
+
+    jQuery.ajax({
+        url: url,
+        type: "GET",
+        data: dataString,
+        cache: "",
+     //   cache: false,
+        dataType: data_type,
+        success: function (data) {
+            
+            
+            
+
+            var countData = _.size(data);
+
+            if(action === "init") {
+              //  console.log("init");
+                // console.log(data.total_thread_count);
+                $(".comments-content-area").html('');
+              //  initScrubber(data.total_thread_count);
+              //  scrubber.max(data.total_thread_count);
+            } else {
+                //update scurbber
+                // console.log(data.total_thread_count);
+              //  scrubber.max(data.total_thread_count);
+            }
+
+            var mainCount = 0;
+
+
+            if(data.hasOwnProperty("sticky")) {
+                var stickyComment =  createStickyCommentHtml(data.sticky);
+                $(".comments-content-area").append(stickyComment);
+            }
+
+            $.each( data, function( key, value ) {
+                var subComments = [];
+                if (typeof value === 'object') {
+                    $.each( value, function( key2, value2) {
+
+                        var comments = [];
+                        if(key2 === "sub") {
+    
+                            var subCount = 0;
+                            var subParentCountThread = 0 ;
+                            $.each( value2, function( key3, value3) {
+    
+                                if(subParentCountThread != value3.parent_ID) {
+                                    subCount++;
+                                    subParentCountThread = value3.parent_ID;
+                                }
+    
+                                var subComment = createSubCommentHtml(value3,subCount);
+                                subComments.push(subComment);
+    
+    
+                            });
+                        }
+    
+                        if(key2 === "thread") {
+                            //  console.log("thread"+value2.thread_ID);
+                            mainCount++;
+                            value2.pagination = dataString['pagination'];
+                            var comment =  createCommentHtml(value2,subComments,mainCount, data.total_thread_count);
+                            comments.push(comment);
+                        }
+    
+    
+                        $(".comments-content-area").append(comments);
+                        
+                    });
+                }
+                
+
+
+            });
+            holdScrub = false;
+            //update hash
+            if (update_position) {
+                var thread = jQuery(".main_thread[data-page='" + dataString['pagination'] + "'][data-position='" + update_position + "']");
+                if (thread.length > 0) {
+                    window.location.hash = thread.attr("id");
+                }
+            }
+
+            if(countData >  19) {
+                $("#show-more-comment-threads").fadeIn();
+            } else {
+                $("#show-more-comment-threads").fadeOut();
+            }
+
+            if(countData === 0) {
+                var no_results = ' <div class="text-center p-5"> No comments were found </div>';
+                $(".comments-content-area").append(no_results);
+            }
+            clearCommentsSpinner();
+            $("#main_comments_spinner").hide();
+            $('[data-rel="tooltip"]').tooltip();
+            Waves.attach('.comment-vote', ['waves-effect','waves-light']);
+
+
+
+        }, error: function (error) {
+            holdScrub = false;
+            $("#main_comments_spinner").hide();
+            clearCommentsSpinner();
+            doAjaxRequestCommentsLoop(page,id,action);
+        }
+    });
+
+}
+
+
+function createSpinnerHtml() {
+
+    $spinner = '<div class="col-12 text-center"><div class="preloader-wrapper small active crazy m-5 comments-loader" id="comments-loader">\n' +
+        '                                    <div  class="spinner-layer spinner-yellow-only spinner-pink-only">\n' +
+        '                                        <div class="circle-clipper left">\n' +
+        '                                            <div class="circle"></div>\n' +
+        '                                        </div>\n' +
+        '                                        <div class="gap-patch">\n' +
+        '                                            <div class="circle"></div>\n' +
+        '                                        </div>\n' +
+        '                                        <div class="circle-clipper right">\n' +
+        '                                            <div class="circle"></div>\n' +
+        '                                        </div>\n' +
+        '                                    </div>\n' +
+        '                                </div></div>';
+
+    return $spinner;
+}
+
+//sticky comment
+function createStickyCommentHtml(obj) {
+
+    obj = obj[0];
+    var cPageType = parseInt($("#page-info").data("page"));
+
+    deleteCommentHtml = '';
+    var mainClass = "";
+
+    hideReply = "d-inline";
+
+    if(pageDetails.year != 22) {
+        hideReply = "d-none";
+    }
+
+
+    obj.avatar =  (typeof obj.avatar === "undefined") ? "/design/img/blank_player.png" : obj.avatar;
+
+    var showMoreBtn = "";
+    // if(obj.reply_thread_count > 2) {
+    //     showMoreBtn = '<div class="d-inline comment-btn show-more-sub-comments mr-2" data-count="'+obj.reply_thread_count+'" data-btn-type="all" data-clicks="0" data-comment-id="'+obj.ID+'" data-comment-sub-count="' + obj.reply_thread_count + '">' +
+    //         ' <i class="fas fa-caret-down"></i> View all ('+obj.reply_thread_count+')' +
+    //         '</div>';
+    // }
+    page_description = jQuery("#page_comment_description").attr("data-description");
+    page_picture = jQuery("#page_comment_picture").attr("data-picture");
+
+    share_title = 'FUT '  + year + ' ' + page_description + ' By ' + obj.username;
+    share_link = location.host + '/' + year + '/comment/' + cPageType + '/' + obj.ID;
+    comment_text = obj.comment_text_clean;
+    //  comment_text = jQuery(comment_text).text();
+    share_description = 'FUT '  + year + ' ' + page_description + ' By ' + obj.username + ': ' + encodeURIComponent(comment_text);
+    share_picture = location.host + page_picture;
+
+    progressBarColor = commentBarVoteColor(obj.likes);
+    commentTextClean = obj.comment_text_clean;
+    if(commentTextClean.includes(":")) commentTextClean = joypixels.shortnameToImage(obj.comment_text_clean);
+    var comment = '  <div id="thread_'+obj.thread_ID+'"   class="'+mainClass+' m_box main_thread z-depth-0 stickyComment pb-0" data-position="0" data-page="' + obj.pagination + '">' +
+        '  <div class="ribbon ribbon-top ribbon-left ribbon-sticky ribbon-site z-depth-1">Sticky</div>\n ' +
+        '<div class="col row  comment-block  comment-block-thread p-3 px-0 pb-2 mt-0" data-page="1" data-page-type="' + cPageType + '" data-comment-id="'+obj.ID+'">\n' +
+        '                        <div class="row col-12 pr-0 mr-0 pl-0">\n' +
+        '                          <div class=" col-12 pr-0 mr-0 pl-3">  <div class="row comment-top-row pb-1">\n' +
+        '                                <div class="col-12">\n' +
+        '                                   <img class="rounded-circle avatar z-depth-1-half mr-0 mb-3" src="' + obj.avatar + '" alt="Avatar"> \n' +
+        '                                    <a class="comment-username-top" href="/community/user/'+obj.username+'"> '+obj.username+'</a>\n' +
+        '                                    <div class="d-inline ml-2 comment-time-top">'+moment.unix(obj.created_unix).format('MMM Do, h:mm A')+'</div>\n' +
+        '                                </div>\n' +
+        '                            </div>\n' +
+        '                               <div class="comment-content pt-0 pl-3 pb-2">'+commentTextClean+'</div>\n' +
+        '\n' +
+        '\n' +
+        '                            <div class="row comment-bottom-row pt-0">\n' +
+        '                                <div class="col-md-10 col-12 comment-btns-bottom notxtselect">\n' +
+        '                                 \n' + showMoreBtn +
+        '                                    <div class="btn btn-white  btn-rounded d-inline comment-vote comment-like ml-2 " data-type="up" data-placement="bottom" data-rel="tooltip" data-original-title="Like">\n' +
+        '                                        <i class="fa fa-thumbs-up"></i>\n' +
+        '                                    </div>\n' +
+        '                                    <div class=" comment-likes" data-current-votes="'+obj.likes+'">\n' +
+        '                                        '+obj.likes+'\n' +
+        '                                    </div>\n' +
+        '                                    <div class="btn  btn-white btn-rounded d-inline comment-vote comment-dislike mx-2" data-type="down" data-placement="bottom" data-rel="tooltip" data-original-title="Dislike">\n' +
+        '                                        <i class="fa fa-thumbs-down"></i>\n' +
+        '                                    </div>\n' +
+        '                                     <div class="d-inline dropup ml-2 comment-menu-dropdown" >\n' +
+        '     <!--Trigger-->\n' +
+        '     <!--Menu-->\n' +
+        '     <div class="dropdown-menu dropdown-primary">\n' +
+        '         <a class="dropdown-item comment-btn report-comment" href="#" data-comment-id="'+obj.ID+'" data-toggle="modal" data-target="#report-comment-modal"><i class="icon-flag3"></i> Report</a>\n' +
+        '         <a class="dropdown-item comment-btn" target="_blank" href="/'+pageDetails.year+'/comment/'+pageDetails.type+'/'+obj.thread_ID+'"> <i class="icon-link"></i> Direct Link</a>\n' +
+        '        <a class="dropdown-item twitter_share_button_comment share_button_comment share_btn tw-ic " href="https://twitter.com/intent/tweet?url=' + share_link + '&via=futbin&text=' + share_title + '" id="b" target="_blank"><i class="icon-twitter share_button twitter_share"></i> Twitter</a>' +
+        '        <a class="dropdown-item facebook_share_button_comment share_button_comment share_btn fb-ic " href=" https://www.facebook.com/dialog/feed?app_id=560753197461198&display=popup&caption=FUTBIN.COM&title=' + share_title + '&link=' + share_link + ' &description=' + share_description + ' &picture=' + share_picture + '" target="_blank"><i class="icon-facebook share_button facebook_share"></i> Facebook</a>' +
+        '   ' +deleteCommentHtml+ ' ' +
+        ' </div>\n' +
+        ' </div>\n' +
+        '\n' +
+        '                        </div>' +
+        '</div>';
+
+    return comment;
+    //  }
+
+
+
+
+
+}
+
+function createUserBadge(level) {
+    return "";
+    if(level === "commentsMod") return "badge-comment-mod";
+    if(level === "founder") return "badge-founder";
+    if(level === "platinum") return "badge-platinum";
+    if(level === "gold") return "badge-gold";
+    if(level === "silver") return "badge-silver";
+
+    return "";
+
+}
+
+function createUserDesription(level) {
+    return "";
+    if(level === "commentsMod") return "Moderator";
+    if(level === "founder") return "FUTBIN Founder";
+    if(level === "platinum") return "FUTBIN Platinum";
+    if(level === "gold") return "FUTBIN Gold";
+    if(level === "silver") return "FUTBIN Silver";
+
+    return "";
+
+}
+
+//comment structure
+function createCommentHtml(obj,subComments,mainCount, totalCount) {
+    var cPageType = parseInt($("#page-info").data("page"));
+
+    badge = "";
+    userTooltipText = "";
+    if(obj.user_level != null && obj.user_level != "regular") {
+     //   userTooltipText = " | " + createUserDesription(obj.user_level);
+        userTooltipText = "" + createUserDesription(obj.user_level);
+        badge = createUserBadge(obj.user_level) + " comment-user-badge";
+
+    }
+
+    deleteCommentHtml = '';
+    if(window.userType === "commentsMod" || window.userType === "founder") {
+        deleteCommentHtml = ' <a class="dropdown-item comment-btn text-danger delete-comment"  href="javascript:void(0);"> <strong><i class="icon-bin"></i> Delete comment</strong> </a>';
+    }
+   // if(key === "main") {
+        var mainClass = "";
+
+        if(mainCount === 1) {
+            mainClass = "first-comment";
+        }
+
+        hideReply = "d-inline";
+
+        if(pageDetails.year != 22) {
+            hideReply = "d-none";
+        }
+
+        var thread_position_id = mainCount; //totalCount - mainCount + 1;
+
+        var showMoreBtn = "";
+        if(obj.reply_thread_count > 2) {
+            showMoreBtn = '<div class="d-inline comment-btn show-more-sub-comments mr-2" data-count="'+obj.reply_thread_count+'" data-btn-type="all" data-clicks="0" data-comment-id="'+obj.ID+'" data-comment-sub-count="' + obj.reply_thread_count + '">' +
+                ' <i class="fas fa-caret-down"></i> View all ('+obj.reply_thread_count+')' +
+                '</div>';
+        }
+
+    obj.avatar =  (typeof obj.avatar === "undefined") ? "/design/img/blank_player.png" : obj.avatar;
+
+        page_description = jQuery("#page_comment_description").attr("data-description");
+        page_picture = jQuery("#page_comment_picture").attr("data-picture");
+
+        share_title = 'FUT '  + year + ' ' + page_description + ' By ' + obj.username;
+        share_link = location.host + '/' + year + '/comment/' + cPageType + '/' + obj.ID;
+        comment_text = obj.comment_text_clean;
+      //  comment_text = jQuery(comment_text).text();
+        share_description = 'FUT '  + year + ' ' + page_description + ' By ' + obj.username + ': ' + encodeURIComponent(comment_text);
+		share_picture = location.host + page_picture;
+		
+        progressBarColor = commentBarVoteColor(obj.likes);
+
+        commentTextClean = obj.comment_text_clean;
+        if(commentTextClean.includes(":")) commentTextClean = joypixels.shortnameToImage(obj.comment_text_clean);
+        var comment = '  <div id="thread_'+obj.thread_ID+'"   class="'+mainClass+' m_box main_thread z-depth-0" data-position="' + thread_position_id + '" data-page="' + obj.pagination + '">' +
+            '  <div class="col row  comment-block  comment-block-thread p-3 px-0 pb-2 mt-0" data-page="1" data-page-type="' + cPageType + '" data-comment-id="'+obj.ID+'">\n' +
+            '                        <div class="row col-12 pr-0 mr-0 pl-0">\n' +
+            '                          <div class=" col-12 pr-0 mr-0 pl-3">  <div class="row comment-top-row pb-1">\n' +
+            '                                <div class="col-12">\n' +
+            '                                   <img class="rounded-circle avatar z-depth-1-half mr-0 mb-3 lazy-main-player lazyload" src="/design/img/blank_player.png" data-src="' + obj.avatar + '" alt="Avatar"> \n' +
+            '                                    <a class="comment-username-top '+badge+'" href="/community/user/'+obj.username+'"> '+obj.username+userTooltipText+'</a>\n' +
+            '                                    <div class="d-inline ml-2 comment-time-top">'+moment.unix(obj.created_unix).format('MMM Do, h:mm A')+'</div>\n' +
+            '                                </div>\n' +
+            '                            </div>\n' +
+            '                               <div class="comment-content pt-0 pl-3 pb-2">'+commentTextClean+'</div>\n' +
+            '\n' +
+            '\n' +
+            '                            <div class="row comment-bottom-row pt-0">\n' +
+            '                                <div class="col-md-10 col-12 comment-btns-bottom notxtselect">\n' +
+            '                                 \n' + showMoreBtn +
+            '                                    <div class="btn btn-white  btn-rounded d-inline comment-vote comment-like ml-2 " data-type="up" data-placement="bottom" data-rel="tooltip" data-original-title="Like">\n' +
+            '                                        <i class="fa fa-thumbs-up"></i>\n' +
+            '                                    </div>\n' +
+            '                                    <div class=" comment-likes" data-current-votes="'+obj.likes+'">\n' +
+            '                                        '+obj.likes+'\n' +
+            '                                    </div>\n' +
+            '                                    <div class="btn  btn-white btn-rounded d-inline comment-vote comment-dislike mx-2" data-type="down" data-placement="bottom" data-rel="tooltip" data-original-title="Dislike">\n' +
+            '                                        <i class="fa fa-thumbs-down"></i>\n' +
+            '                                    </div>\n' +
+            '                                    <div class=" comment-btn reply-to-comment '+hideReply+'">\n' +
+            '                                        <i class="icon-reply"></i> Reply\n' +
+            '                                    </div>\n' +
+            '                                     <div class="d-inline dropup ml-2 comment-menu-dropdown" >\n' +
+            '     <!--Trigger-->\n' +
+            '     <a class="d-inline dropdown-toggle comment-menu-btn" type="text"  id="dropdownMenu'+obj.ID+'" data-toggle="dropdown" aria-haspopup="true" aria-expanded="false">' +
+            '<i class="icon-menu"></i>' +
+            '</a>\n' +
+            '     <!--Menu-->\n' +
+            '     <div class="dropdown-menu dropdown-primary">\n' +
+            '         <a class="dropdown-item comment-btn report-comment" href="#" data-comment-id="'+obj.ID+'" data-toggle="modal" data-target="#report-comment-modal"><i class="icon-flag3"></i> Report</a>\n' +
+            '         <a class="dropdown-item comment-btn" target="_blank" href="/'+pageDetails.year+'/comment/'+pageDetails.type+'/'+obj.thread_ID+'"> <i class="icon-link"></i> Direct Link</a>\n' +
+		    '        <a class="dropdown-item twitter_share_button_comment share_button_comment share_btn tw-ic " href="https://twitter.com/intent/tweet?url=' + share_link + '&via=futbin&text=' + share_title + '" id="b" target="_blank"><i class="icon-twitter share_button twitter_share"></i> Twitter</a>' +
+		    '        <a class="dropdown-item facebook_share_button_comment share_button_comment share_btn fb-ic " href=" https://www.facebook.com/dialog/feed?app_id=560753197461198&display=popup&caption=FUTBIN.COM&title=' + share_title + '&link=' + share_link + ' &description=' + share_description + ' &picture=' + share_picture + '" target="_blank"><i class="icon-facebook share_button facebook_share"></i> Facebook</a>' +
+            '   ' +deleteCommentHtml+ ' ' +
+            ' </div>\n' +
+            ' </div>\n' +
+            '                                </div>\n' +
+            // '                                <div class="col-md-4 col-12 text-right pr-0 mr-0">\n' +
+            // '                                    <div class="d-inline comment-vote-block ml-3">\n' +
+            // '                                        <div class="d-inline comment-vote" data-type="up" data-vote="5" data-toggle="tooltip" data-placement="top" title="+5 coins">\n' +
+            // '                                            <img class="comments-coins" src="/design/img/futbin_coins_gold.png">\n' +
+            // '                                        </div>\n' +
+            // '                                        <div class="d-inline comment-vote" data-type="up" data-vote="1" data-toggle="tooltip" data-placement="top" title="+1 coin">\n' +
+            // '                                            <img class="comments-coins" src="/design/img/futbin_coins.png">\n' +
+            // '                                        </div>\n' +
+            // '                                        <div class="d-inline ml-1 comment-total-votes" data-current-votes="'+obj.likes+'">' +
+            // '                                           <div class="progress progress-vote" data-current-value="'+obj.likes+'">\n' +
+            // '                                                 <div class="progress-bar '+progressBarColor+'" role="progressbar" style="width: '+voteProgressWidth+'%" aria-valuenow="25" aria-valuemin="0" aria-valuemax="100"></div>\n' +
+            // '</div>' +
+            // '</div>\n' +
+            // '                                        <div class="d-inline comment-vote ml-1" data-type="down" data-vote="-1" data-toggle="tooltip" data-placement="top" title="-1 coin">\n' +
+            // '                                            <img class="comments-coins"  src="/design/img/futbin_coins_red.png">\n' +
+            // '                                        </div>\n' +
+            // '                                        <div class="d-inline comment-vote ml-1" data-type="down" data-vote="-5" data-toggle="tooltip" data-placement="top" title="-5 coins">\n' +
+            // '                                            <img class="comments-coins"  src="/design/img/futbin_coins_black.png">\n' +
+            // '                                        </div>\n' +
+            // '                                    </div>\n' +
+            // '\n' +
+            // '                                </div>\n' +
+            '\n' +
+            '                                <div class="col-12 reply-to-area">\n' +
+            '\n' +
+            '                                </div>\n' +
+            '                        </div>    </div>  </div>\n' +
+            '\n' +
+            '<div class="sub-comments-area row col-12">'+subComments.join(" ")+'</div>\n' +
+            '                        </div>' +
+            '</div>';
+
+        return comment;
+  //  }
+
+
+
+
+
+}
+
+function createSubCommentHtml(obj,count) {
+    var cPageType = parseInt($("#page-info").data("page"));
+    var showMoreBtn = "";
+
+    badge = "";
+    userTooltipText = "";
+    if(obj.user_level != null && obj.user_level != "regular") {
+        userTooltipText = " | " + createUserDesription(obj.user_level);
+        badge = createUserBadge(obj.user_level) + " comment-user-badge";
+    }
+
+    deleteCommentHtml = '';
+    if(window.userType === "commentsMod" || window.userType === "founder") {
+        deleteCommentHtml = ' <a class="dropdown-item comment-btn text-danger delete-comment"  href="javascript:void(0);"> <strong><i class="icon-bin"></i> Delete comment</strong> </a>';
+    }
+
+    if(obj.reply_parent_count > 0) {
+        showMoreBtn = '<div class="d-inline comment-btn show-more-thread-sub-comments mr-2" data-count="'+obj.reply_parent_count+'" data-btn-type="more" data-clicks="0"  data-comment-id="'+obj.ID+'">' +
+            ' <i class="fas fa-caret-down"></i> View replies ('+obj.reply_parent_count+')' +
+            '</div>';
+    }
+
+    hideReply = "d-inline";
+
+    if(pageDetails.year != 22) {
+        hideReply = "d-none";
+    }
+
+    obj.avatar =  (typeof obj.avatar === "undefined") ? "/design/img/blank_player.png" : obj.avatar;
+
+
+
+    page_description = jQuery("#page_comment_description").attr("data-description");
+    page_picture = jQuery("#page_comment_picture").attr("data-picture");
+
+    share_title = 'FUT '  + year + ' ' + page_description + ' By ' + obj.username;
+    share_link = location.host + '/' + year + '/comment/' + cPageType + '/' + obj.ID;
+    comment_text = obj.comment_text_clean;
+   // comment_text = jQuery(comment_text).text();
+    share_description = 'FUT '  + year + ' ' + page_description + ' By ' + obj.username + ': ' + encodeURIComponent(comment_text);
+    share_picture = location.host + page_picture;
+
+    progressBarColor = commentBarVoteColor(obj.likes);
+    // countMargin = count * 15;
+    commentTextClean = obj.comment_text_clean;
+    if(commentTextClean.includes(":")) commentTextClean = joypixels.shortnameToImage(obj.comment_text_clean);
+    var comment = '  <div  id="sub_comment_'+obj.ID+'" class="col-12 pr-0 mr-0 sub-comment-row pl-3">' +
+        '  <div class="row  comment-block sub-comment-block py-3"  data-page="1" data-page-type="' + cPageType + '" data-comment-id="'+obj.ID+'" >\n' +
+        '                          <div class="col-12 ml-0 pl-0 pr-0 mr-0">  <div class="row comment-top-row pb-1">\n' +
+        '                                <div class="col-12">\n' +
+        '                                   <img class="rounded-circle avatar z-depth-1-half mr-0 mb-3 lazy-main-player lazyload" src="/design/img/blank_player.png" data-src="' + obj.avatar + '" alt="Avatar"> \n' +
+        '                                    <a class="comment-username-top '+badge+'" href="/community/user/'+obj.username+'">'+obj.username+userTooltipText+'</a>\n' +
+        '                                    <div class="d-inline ml-2 comment-time-top">'+moment.unix(obj.created_unix).format('MMM Do, h:mm A')+'</div>\n' +
+        '                                </div>\n' +
+        '                            </div>\n' +
+        '\n' +
+        '                                   <div class="comment-content pt-0 pl-3 pb-2">'+commentTextClean+'</div>' +
+        '\n' +
+        '\n' +
+        '                            <div class="row comment-bottom-row pt-0">\n' +
+        '                                <div class="col-md-6 col-12 comment-btns-bottom notxtselect">\n' +
+        '                                \n' + showMoreBtn +
+        '                                    <div class="btn btn-white  btn-rounded d-inline comment-vote comment-like ml-2 " data-type="up" data-placement="bottom" data-rel="tooltip" data-original-title="Like">\n' +
+        '                                        <i class="fa fa-thumbs-up"></i>\n' +
+        '                                    </div>\n' +
+        '                                    <div class=" comment-likes" data-current-votes="'+obj.likes+'">\n' +
+        '                                        '+obj.likes+'\n' +
+        '                                    </div>\n' +
+        '                                    <div class="btn  btn-white btn-rounded d-inline comment-vote comment-dislike mx-2" data-type="down" data-placement="bottom" data-rel="tooltip" data-original-title="Dislike">\n' +
+        '                                        <i class="fa fa-thumbs-down"></i>\n' +
+        '                                    </div>\n' +
+        '                                    <div class="comment-btn reply-to-comment '+hideReply+'">\n' +
+        '                                        <i class="icon-reply"></i> Reply\n' +
+        '                                    </div>\n' +
+        '                                     <div class="d-inline dropup ml-2 comment-menu-dropdown" >\n' +
+        '     <!--Trigger-->\n' +
+        '     <a class="d-inline dropdown-toggle comment-menu-btn" type="text"  id="dropdownMenu'+obj.ID+'" data-toggle="dropdown" aria-haspopup="true" aria-expanded="false">' +
+        '<i class="icon-menu"></i>' +
+        '</a>\n' +
+        '     <!--Menu-->\n' +
+        '     <div class="dropdown-menu dropdown-primary">\n' +
+        '         <a class="dropdown-item comment-btn " href="#" data-comment-id="'+obj.ID+'" data-toggle="modal" data-target="#report-comment-modal"><i class="icon-flag3"></i> Report</a>\n' +
+        '         <a class="dropdown-item comment-btn"  target="_blank" href="/'+pageDetails.year+'/comment/'+pageDetails.type+'/'+obj.ID+'"><i class="icon-link"></i> Direct Link </a>\n' +
+        '        <a class="dropdown-item twitter_share_button_comment share_button_comment share_btn tw-ic " href="https://twitter.com/intent/tweet?url=' + share_link + '&via=futbin&text=' + share_title + '" id="b" target="_blank"><i class="icon-twitter share_button twitter_share"></i> Twitter</a>' +
+        '        <a class="dropdown-item facebook_share_button_comment share_button_comment share_btn fb-ic " href=" https://www.facebook.com/dialog/feed?app_id=560753197461198&display=popup&caption=FUTBIN.COM&title=' + share_title + '&link=' + share_link + ' &description=' + share_description + ' &picture=' + share_picture + '" target="_blank"><i class="icon-facebook share_button facebook_share"></i> Facebook</a>' +
+
+        '  ' +deleteCommentHtml+ ' ' +
+        '  </div>\n' +
+        ' </div>\n' +
+        '                                </div>\n' +
+        // '                                <div class="col-md-6 col-12 text-right pr-0 mr-0">\n' +
+        // '                                    <div class="d-inline comment-vote-block ml-3">\n' +
+        // '                                        <div class="d-inline comment-vote" data-type="up"  data-vote="5" data-toggle="tooltip" data-placement="top" title="+5 coins">\n' +
+        // '                                            <img class="comments-coins" src="/design/img/futbin_coins_gold.png">\n' +
+        // '                                        </div>\n' +
+        // '                                        <div class="d-inline comment-vote" data-type="up"  data-vote="1" data-toggle="tooltip" data-placement="top" title="+1 coin">\n' +
+        // '                                            <img class="comments-coins" src="/design/img/futbin_coins.png">\n' +
+        // '                                        </div>\n' +
+        // '                                        <div class="d-inline ml-1 comment-total-votes" data-current-votes="'+obj.likes+'">' +
+        // '                                           <div class="progress progress-vote" data-current-value="'+obj.likes+'">\n' +
+        // '                                                 <div class="progress-bar '+progressBarColor+'" role="progressbar" style="width: '+voteProgressWidth+'%" aria-valuenow="25" aria-valuemin="0" aria-valuemax="100"></div>\n' +
+        //                                              '</div>' +
+        // '                                       </div>\n' +
+        // '                                        <div class="d-inline comment-vote ml-1" data-type="down"  data-vote="-1" data-toggle="tooltip" data-placement="top" title="-1 coin">\n' +
+        // '                                            <img class="comments-coins"  src="/design/img/futbin_coins_red.png">\n' +
+        // '                                        </div>\n' +
+        // '                                        <div class="d-inline comment-vote ml-1" data-type="down"  data-vote="-5" data-toggle="tooltip" data-placement="top" title="-5 coins">\n' +
+        // '                                            <img class="comments-coins"  src="/design/img/futbin_coins_black.png">\n' +
+        // '                                        </div>\n' +
+        // '                                    </div>\n' +
+        // '\n' +
+        // '                                </div>\n' +
+        '\n' +
+        '                                <div class="col-12 reply-to-area">\n' +
+        '\n' +
+        '                                </div>\n' +
+        '                         <div class="sub-comments-child-area row col-12 px-0"></div>   </div>\n' +
+        '\n' +
+        '\n' +
+        '                       </div>  </div>' +
+        '</div>';
+
+    return comment;
+}
+
+
+function commentBarVoteColor(likes) {
+
+    if(likes < -99) return "black";
+    if(likes < 0) return "red";
+    if(likes > 99) return "gold";
+    if(likes > 0) return "green";
+    if(likes === 0) return "grey";
+}
+
+// var scrubber = new ScrubberView();
+// var scrubberUp = false;
+// var holdScrub = false;
+// var per_page = 20;
+
+//scrolling setup for scrubber - update scrubber when scrolling
+// $(window).bind('scroll', function() {
+//
+//
+//
+//     if (  jQuery('.main_thread').length != 0 &&  isInView ( jQuery('.main_thread') ) ) {
+//         // console.log('in view');
+//         // var per_page = 20;
+//         var pages = Math.ceil( scrubber.max() / per_page );
+//
+//         // iterate over all pages
+//         for (i = 1; i <= pages; i++) {
+//             var elem = jQuery(".main_thread[data-page='"+ i +"']");
+//             if (elem.length > 0) {
+//                 if ( isInView( elem ) ) {
+//                     elem.each(function() {
+//                         if ( isInView( this, false ) ) {
+//                             sValue = parseInt( jQuery(this).attr("data-position") ) + ( i - 1 ) * per_page - 1; //* i;
+//
+//                             scrubber.value( scrubber.max() - sValue );
+//                         }
+//                     });
+//                 }
+//                 //check if page and scrubber value clash
+//             } else if (scrubber.value() === ( i - 1 ) * per_page  && !holdScrub) {
+//
+//                 //to do load new comments
+//                 scrubberUp = scrubber.value() + 1;
+//                 jQuery("#scrubber-page").attr("data-page", i);
+//
+//             }
+//
+//         }
+//
+//     } else {
+//         // console.log('out of view');
+//     }
+//
+// });
+
+function initScrubber(scrubberValue) {
+    return false;
+    // Make a new scrubber
+
+    jQuery('body').append('<div id="scrubber-page" class="hidden" data-page="1"></div>');
+
+// Append it to the dom
+    //  document.body.appendChild(scrubber.elt);
+    $('.scrubber-vert').append(scrubber.elt);
+    scrubber.elt.style.width = "10px";
+    scrubber.elt.style.height = "100%";
+
+// onScrubStart is called whenever a user starts scrubbing
+    scrubber.onScrubStart = function (value) {
+        // console.log(value); // the value at the time of scrub start
+    }
+
+// onValueChanged is called whenever the scrubber is moved.
+    scrubber.onValueChanged = function (value) {
+        //if scrubber point reached and and comments are missing - load them
+        if (scrubberUp === value) {
+            holdScrub = true;
+            scrubberUp = false;
+            var pageType = $("#page-info").data('page');
+            var pageId = $('#page-info').data('id');
+
+            doAjaxRequestComments(pageType,pageId, "scrubber", false);
+            
+        }
+
+        //to do update date and number of posts
+        
+        
+    }
+
+// onScrubEnd is called whenever a user stops scrubbing
+    scrubber.onScrubEnd = function (value) {
+        // console.log(value); // the value at the time of scrub end
+
+        var thread_id = scrubber.max() - value + 1;
+        var needed_page = Math.ceil( thread_id / per_page );
+        var position = thread_id - ( needed_page - 1 ) * per_page;
+
+        jQuery("#scrubber-page").attr("data-page", needed_page);
+
+        var thread = jQuery(".main_thread[data-page='" + needed_page + "'][data-position='" + position + "']");
+        
+        if (thread.length > 0) {
+            window.location.hash = thread.attr("id");
+        } else if (!holdScrub) {
+            holdScrub = true;
+
+            var pageType = $("#page-info").data('page');
+            var pageId = $('#page-info').data('id');
+
+            doAjaxRequestComments(pageType,pageId, "scrubber", position);
+        }
+
+        
+
+        
+    }
+
+// You can read and update the scrubber's min, max, step, value, and orientation
+// using accessor functions
+    scrubber.min(0);// 0
+    scrubber.max(scrubberValue); // 1
+    scrubber.step(1); // 0
+    scrubber.value(scrubberValue); // 0
+    scrubber.orientation('vertical'); // 'horizontal'
+
+    // scrubber.value(0.5); // Updates the scrubber's value
+    // scrubber.value(); // 0.5
+
+// Setters are chainable
+    //  scrubber.min(150).max(0).step(1).value(70).orientation('vertical');
+
+// jQuery isn't required, but you can use it to append scrubbers after you've
+// created them if you want
+//     var scrubber2 = new ScrubberView();
+//     $('.scrubber-vert').append(scrubber.elt);
+//
+// // By default, scrubbers are 200px wide. You can use css to change their size
+//     scrubber.elt.style.width = "10px";
+//     scrubber.elt.style.height = "100%";
+}
+
+
+function Utils() {
+
+}
+
+Utils.prototype = {
+    constructor: Utils,
+    isElementInView: function (element, fullyInView) {
+        var pageTop = $(window).scrollTop();
+        var pageBottom = pageTop + $(window).height();
+        var elementTop = $(element).offset().top;
+        var elementBottom = elementTop + $(element).height();
+
+        if (fullyInView === true) {
+            return ((pageTop < elementTop) && (pageBottom > elementBottom));
+        } else {
+            return ((elementTop <= pageBottom) && (elementBottom >= pageTop));
+        }
+    }
+};
+
+var Utils = new Utils();
+
+function isInView(elem){
+    return $(elem).offset().top - $(window).scrollTop() < $(elem).height() ;
+ }
